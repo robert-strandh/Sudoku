@@ -1,4 +1,6 @@
-(asdf:defsystem :sudoku
+(cl:in-package #:asdf-user)
+
+(defsystem :sudoku
   :depends-on (:mcclim)
   :components
   ((:file "packages" :depends-on ())
