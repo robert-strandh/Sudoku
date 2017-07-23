@@ -27,3 +27,6 @@
       :alphabet alphabet
       :blank 0
       :board board)))
+
+(defun board-length (game)
+  (expt (size game) 2))

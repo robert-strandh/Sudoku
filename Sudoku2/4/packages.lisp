@@ -5,7 +5,8 @@
 	   #:size
 	   #:alphabet
 	   #:blank
-	   #:board))
+	   #:board
+	   #:board-length))
 
 (defpackage #:sudoku-solver
     (:use #:cl)
