@@ -6,6 +6,11 @@
 	   #:alphabet
 	   #:blank
 	   #:board
+	   #:allowed
+	   #:row-set
+	   #:col-set
+	   #:area-set
+	   #:all-sets
 	   #:board-length))
 
 (defpackage #:sudoku-solver
