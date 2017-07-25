@@ -9,7 +9,15 @@
   ((%size :initarg :size :reader size)
    (%alphabet :initarg :alphabet :reader alphabet)
    (%blank :initarg :blank :reader blank)
-   (%board :initarg :board :reader board)))
+   (%board :initarg :board :reader board)
+   ;; bit-arrays of allowed values for each cell
+   (%allowed :initform nil :accessor allowed)
+   ;; areas in which values need to be unique - typically rows, columns, and the 3x3 quadrants.
+   (%rows :initform nil :accessor row-set)
+   (%cols :initform nil :accessor col-set)
+   (%areas :initform nil :accessor area-set)
+   ;; all these areas in one list.
+   (%all :initform nil :accessor all-sets)))
 
 ;;; take a 9x9 matrix containing numbers 0-9 
 ;;; (where 0 means a blank cell) and produce 
@@ -27,3 +35,6 @@
       :alphabet alphabet
       :blank 0
       :board board)))
+
+(defun board-length (game)
+  (expt (size game) 2))

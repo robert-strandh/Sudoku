@@ -5,11 +5,19 @@
 	   #:size
 	   #:alphabet
 	   #:blank
-	   #:board))
+	   #:board
+	   #:allowed
+	   #:row-set
+	   #:col-set
+	   #:area-set
+	   #:all-sets
+	   #:board-length))
 
 (defpackage #:sudoku-solver
     (:use #:cl)
-  (:export #:stupid-solver))
+  (:export #:stupid-solver
+           #:allowed-values-in-cell
+           #:solve-one-step))
 
 (defpackage #:sudoku-draw-board
     (:use :cl)

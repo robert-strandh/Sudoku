@@ -7,7 +7,10 @@
   ((%game :initarg :game :accessor game)
    (%solution :initform nil :accessor solution)
    (%show-errors :initform nil :accessor show-errors)
-   (%selected-cell :initform nil :accessor selected-cell))
+   (%selected-cell :initform nil :accessor selected-cell)
+   (%reason-field :initform nil :accessor reason-field)
+   (%highlighted :initform nil :accessor highlighted)
+   (%show-p-v :initform nil :accessor show-p-v-field))
   (:panes
    (quit-button
     :push-button
@@ -30,12 +33,49 @@
 			 (redisplay-frame-panes *application-frame*)))
    (app :application
 	:width 500 :height 550
-	:display-function 'display-sudoku-pane))
+	:display-function 'display-sudoku-pane)
+   (reason-field
+     :text-field
+     :value "-")
+   (show-possible-values
+     (with-radio-box (:orientation :horizontal)
+       (clim:radio-box-current-selection "Show") "No"))
+   (step-button
+     :push-button
+     :label " Step "
+     :max-width 40
+     :activate-callback (lambda (button)
+                          (declare (ignore button))
+                          (let* ((game (game *application-frame*))
+                                 (result (sudoku-solver:solve-one-step game))
+                                 (ht (make-hash-table :test #'eql)))
+                            (if result
+                                (destructuring-bind (reason . cells) result
+                                  (loop for hl-level in (list +blue+ +orange+)
+                                        for cell-list in (if (listp (first cells))
+                                                             cells
+                                                             (list cells))
+                                        do (dolist (c cell-list)
+                                             (alexandria:ensure-gethash c ht hl-level)))
+                                  (print reason *trace-output*)))
+                            (setf (gadget-value 
+                                    (reason-field *application-frame*))
+                                  (or (first result)
+                                      "No further inference"))
+                            (setf (highlighted *application-frame*)
+                                  ht)
+                           (redisplay-frame-panes *application-frame*)))))
   (:layouts
    (default (vertically ()
 	      (horizontally ()
 		quit-button show-errors-button)
-	      app))))
+	      app
+              (horizontally ()
+                (setf (show-p-v-field *application-frame*)
+		      show-possible-values)
+                step-button
+                (setf (reason-field *application-frame*)
+                      reason-field))))))
 
 (defmethod initialize-instance :after ((frame sudoku) &rest args &key)
   (declare (ignore args))
@@ -70,8 +110,22 @@
 			      +yellow+
 			      +white+)))
 		 (with-output-as-presentation (pane (list r c) 'cell)
-		   (draw-rectangle* pane 0 0 40 40 :ink ink)))
-	       (unless (eql (aref board r c) blank)
+		     (draw-rectangle* pane 0 0 40 40 :ink ink)
+                     (if (highlighted *application-frame*)
+                         (let ((highlighted? (gethash (+ c (* r size size))
+                                                      (highlighted *application-frame*))))
+                           (if highlighted?
+                               (draw-rectangle* pane 1 1 39 39 
+                                                :line-thickness 2
+                                                :ink highlighted?
+                                                :filled nil))))))
+	       (if (eql (aref board r c) blank)
+		 (let ((allowed (sudoku-solver:allowed-values-in-cell game r c)))
+		   (draw-text* pane (format nil "~{~a~}" allowed)
+			       20 20
+			       :text-size :small
+			       :align-x :center :align-y :center
+			       :ink +grey+))
 		 (let ((ink (if (and (show-errors frame)
 				     (not (eql (aref board r c)
 					       (aref (solution frame) r c))))
