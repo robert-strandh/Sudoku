@@ -96,7 +96,6 @@
                             location)))
   (eql value
        (sudoku-game:blank game)))
-  
 
 
 (defun is-allowed (mask bit)
@@ -106,7 +105,8 @@
   (not (is-allowed mask bit)))
 
 (defun number-of-set-bits (mask)
-  (reduce #'+ 
+  (declare (type (allowed-in-cell *) mask))
+  (reduce #'+
           mask))
 
 (defun rule-outcome (involved-cells 
@@ -321,40 +321,64 @@
                    do (restrict-by-neighbours col area allowed)))))
 
 
-
-(defun subset-restrictions (cell-set allowed)
-  (let ((same-allowed (make-hash-table :test #'equal)))
+(defun subset-restrictions (game cell-set allowed)
+  (let ((mask-and-loc ()))
+    ;; collect cells with multiple possible values in a list
     (loop for location in cell-set
-          do (push location
-                   (gethash (row-major-aref allowed location)
-                            same-allowed)))
-    (loop for mask being the hash-key of same-allowed
-          using (hash-value locations)
-          for bits-set = (number-of-set-bits mask)
-          if (= (length locations)
-                bits-set)
-          do (loop with other-cells = (set-difference cell-set
-                                                      locations
-                                                      :test #'eql)
-                   for bit in (allowed-bits-in-mask mask)
-                   collect (value-from-bitnumber bit) into disallowed-values
-                   ;
-                   sum (clear-bits-in-set allowed
+          if (is-blank game :location location)
+          do (push (cons (row-major-aref allowed location)
+                         location)
+                   mask-and-loc))
+    ;; Now find some small subset.
+    (labels
+      ((subset-restrictions-one-subset (mask-and-loc all-cells allowed)
+         (let* ((combined-mask (reduce #'bit-ior mask-and-loc :key #'car))
+                (bits-set (number-of-set-bits combined-mask)))
+           (if (= bits-set 
+                  (length mask-and-loc))
+               ;; Okay; remove these possible values from the other cells' masks.
+               (loop with other-cells = (set-difference all-cells
+                                                        (mapcar #'cdr mask-and-loc)
+                                                        :test #'eql)
+                     for bit in (allowed-bits-in-mask combined-mask)
+                     collect (value-from-bitnumber bit) into disallowed-values
+                     ;;
+                     sum (clear-bits-in-set allowed
                                             bit
                                             other-cells) into bits-cleared
-                   finally (if (plusp bits-cleared)
-                               (return-from subset-restrictions
-                                 (rule-outcome (list cell-set)
-                                               "Remove ~a from ~a"
-                                               disallowed-values cell-set)))))))
+                     ;; Only if that did change something, else
+                     ;; we'd be stuck at some state.
+                     finally 
+                     (if (plusp bits-cleared)
+                         (return-from subset-restrictions
+                           (rule-outcome (list other-cells cell-set)
+                                         "Remove ~a from ~a"
+                                         disallowed-values other-cells)))))))
+       (one-subset (set length rest)
+         (when rest
+           (one-subset                    set      length  (rest rest))
+           (one-subset (cons (first rest) set) (1+ length) (rest rest)))
+         ;; Handle one set.
+         ;; A single location is already handled by
+         ;; RULE-ONLY-ONE-POSSIBILITY resp. RULE-EVERY-MUST-EXIST.
+         (when (and (not rest)
+                    (>= length 2)
+                    (/= length (length cell-set)))
+           (subset-restrictions-one-subset set
+                                           (mapcar #'cdr mask-and-loc)
+                                           allowed))))
+      (one-subset () 0 mask-and-loc))))
 
 (defun rule-full-subset-restricts-rest (game allowed)
-  "If N cells of a quad allow only the same N numbers, then _no_ other 
-   cells in that quad may have these - neither other in the same row or 
-   col.
-   Eg. if two cells end up with (2 7), then the rest must not have these."
+  "If a subset of size N of related cells have exactly N still missing
+   values, these values cannot be in the other related cells.
+
+     1x4   {x,y,z} must be {7,8,9} (in some order),
+     2y5   so the whole column must not have any of {7,8,9}
+     3z6   any more.
+"
   (loop for set in (sudoku-game:all-sets game)
-        thereis (subset-restrictions set allowed)))
+        thereis (subset-restrictions game set allowed)))
 
 
 (defun solve-one-step (game)
